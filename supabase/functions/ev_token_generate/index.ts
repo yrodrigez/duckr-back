@@ -185,19 +185,19 @@ async function fetchBattleNetWoWAccounts(token: string) {
 }
 
 async function selectOrCreateMember(character: GuildCharacter) {
+
     const {
         data: memberData,
         error: memberError
-    } = await supabase.from('ev_member').select('id, user_id').eq('id', character.id).single()
+    } = await supabase.from('ev_member')
+        .select('id, user_id')
+        .limit(1)
+        .eq('id', character.id)
+        .single()
 
-    if (memberError) {
-        throw new Error('Error fetching member' + JSON.stringify(memberError))
-    }
-
-    if (memberData) {
+    if (memberData?.user_id) {
         return memberData.user_id
     }
-
 
     const {data: created, error: createdError} = await supabase.from('ev_member')
         .insert({
@@ -220,9 +220,18 @@ async function findMemberWithRole(character: GuildCharacter) {
     const {
         data: roleData,
         error: roleError
-    } = await supabase.from('ev_member_role').select('role:ev_role(name, id)').eq('member_id', character.id).single()
+    } = await supabase.from('ev_member_role').select('role:ev_role(name, id)').eq('member_id', character.id)
     if (roleError) {
         throw new Error('Error fetching member role' + JSON.stringify(roleError) + 'for character ' + JSON.stringify(character))
+    }
+
+    const role = (roleData || [])[0]
+    if(!role) {
+        return {
+            name: null,
+            userId,
+            permissions: []
+        }
     }
 
     const {
@@ -237,7 +246,7 @@ async function findMemberWithRole(character: GuildCharacter) {
 
     return {
         //@ts-ignore - roleData.role is not null
-        name: roleData.role.name,
+        name: (roleData ?? [])[0]?.role?.name,
         userId,
         permissions: (permissionsData || []).map((x: { permission: string }) => x.permission)
     }
@@ -251,11 +260,14 @@ async function execute(blizzardToken: string, selectedCharacter: any) {
     if (!currentCharacter) {
         throw new Error('Selected character not found in the list of characters')
     }
+
     // @ts-ignore - currentCharacter is not null
     const avatar = await findCharacterAvatar(blizzardToken, currentCharacter?.name, currentCharacter?.realm)
+
     const characterWithAvatar = {...currentCharacter, avatar}
     // @ts-ignore - characterWithAvatar is not null
     const characterWithRole = await findMemberWithRole(characterWithAvatar)
+
     const authId = characterWithRole.userId
 
     const token = await generateToken({
@@ -302,6 +314,7 @@ Deno.serve(async (req) => {
     try {
         return await execute(blizzardToken, selectedCharacter)
     } catch (e) {
+        console.error(e)
         return new Response(
             JSON.stringify({error: e.message}),
             {status: 500, headers: {"Content-Type": "application/json"}},

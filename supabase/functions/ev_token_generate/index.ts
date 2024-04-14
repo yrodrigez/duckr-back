@@ -1,11 +1,15 @@
-import {create, getNumericDate} from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+// deno-lint-ignore-file no-explicit-any
+import {getNumericDate} from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import {createClient} from "npm:@supabase/supabase-js"
+import {generateToken} from "./use-cases/generateToken.ts";
 
 const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
 )
-const JWT_EV_PRIVATE_KEY = Deno.env.get('JWT_EV_PRIVATE_KEY')!.replace(/\\n/g, '\n');
+
+const expiresIn = 60 * 60 * 24 * 7
+
 type WoWCharacter = {
     name: string,
     id: number
@@ -27,6 +31,7 @@ type BattleNetAccount = {
     wow_accounts: WoWAccount[]
 }
 type GuildCharacter = {
+    userId: any;
     name: string,
     id: number,
     realm: string,
@@ -44,10 +49,10 @@ type GuildCharacter = {
 }
 
 type TokenPayload = {
-
     id: number,
     wowAccountId: number
     characters: {
+        userId: string;
         name: string,
         id: number,
         realm: string,
@@ -72,31 +77,6 @@ const locale = 'en_US'
 const allowedRealms = ['lone-wolf']
 const guild = 'Everlasting Vendetta'
 
-function base64ToArrayBuffer(base64: string) {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-}
-
-const expiresIn = 60 * 60 * 24;
-
-async function generateToken(payload: TokenPayload) {
-    const key = await crypto.subtle.importKey(
-        "pkcs8",
-        base64ToArrayBuffer(JWT_EV_PRIVATE_KEY),
-        {
-            name: "RSASSA-PKCS1-v1_5",
-            hash: {name: "SHA-256"},
-        },
-        false,
-        ["sign"]
-    );
-
-    return create({alg: "RS256", typ: "JWT"}, {...payload, exp: getNumericDate(expiresIn)}, key);
-}
 
 async function findCharacterAvatar(token: string, characterName: string, realmSlug: string): Promise<string | null | undefined> {
     const url = `https://eu.api.blizzard.com/profile/wow/character/${realmSlug}/${characterName.toLowerCase()}/character-media`
@@ -123,7 +103,7 @@ async function findCharacterAvatar(token: string, characterName: string, realmSl
     return avatarObject?.value
 }
 
-async function getCharacterIfInGuild(token: string, characterName: string, realmSlug: string) {
+async function getCharacterDetails(token: string, characterName: string, realmSlug: string) {
     const url = `https://eu.api.blizzard.com/profile/wow/character/${realmSlug}/${characterName.toLowerCase()}`;
     const query = new URLSearchParams({
         locale,
@@ -145,19 +125,12 @@ async function getCharacterIfInGuild(token: string, characterName: string, realm
         return null
     }
 
-    if (!character.guild) {
-        return null
-    }
-
-    if (character.guild.name !== guild) {
-        return null
-    }
-
     return character
 }
 
-async function fetchBattleNetWoWAccounts(token: string): Promise<TokenPayload> {
+async function fetchBattleNetWoWAccounts(token: string) {
     if (!token) {
+        console.log('NO token')
         throw new Error('fetchBattleNetWoWAccounts - token parameter is required')
     }
 
@@ -172,7 +145,10 @@ async function fetchBattleNetWoWAccounts(token: string): Promise<TokenPayload> {
             'Authorization': 'Bearer ' + token,
         }
     });
+
     if (!response.ok) {
+        const text = await response.text()
+        console.log('Error fetching wow accounts, verify your token', `${response.status} - ${text}`)
         throw new Error('Error fetching wow accounts, verify your token')
     }
     const data: BattleNetAccount = await response.json();
@@ -187,12 +163,10 @@ async function fetchBattleNetWoWAccounts(token: string): Promise<TokenPayload> {
         throw new Error('No characters found in allowed realms')
     }
 
+    //@ts-ignore - wowAccount is not null
     const charactersWithDetails: GuildCharacter[] = (await Promise.all(characters.map(async character => {
-        const guildCharacter = await getCharacterIfInGuild(token, character.name, character.realm.slug)
-        if (guildCharacter) {
-            return guildCharacter
-        }
-        return null
+        const guildCharacter = await getCharacterDetails(token, character.name, character.realm.slug)
+        return guildCharacter ?? null
     }))).filter(x => x)
         .map((character: any) => ({
             name: character.name,
@@ -207,53 +181,41 @@ async function fetchBattleNetWoWAccounts(token: string): Promise<TokenPayload> {
             role: null
         }))
 
-    const charactersWithAvatar = await Promise.all(charactersWithDetails.map(async character => {
-        if (character) {
-            //@ts-ignore - character is not null
-            character.avatar = await findCharacterAvatar(token, character.name, character.realm) || null
-        }
-        return character
-    }))
-
-    const characterWithRole = await Promise.all(charactersWithAvatar.map(async character => {
-        if (character) {
-            try {
-                character.role = await findMemberRole(character)
-            } catch (e) {
-                console.error('Error fetching member role', e)
-                character.role = null
-            }
-        }
-        return character
-
-    }))
-
-    // @ts-ignore - wowAccount is not null
-    return {
-        characters: characterWithRole,
-        id: data.id,
-        wowAccountId: wowAccount.id
-    }
+    return charactersWithDetails
 }
 
-async function findMemberRole(character: GuildCharacter) {
+async function selectOrCreateMember(character: GuildCharacter) {
     const {
         data: memberData,
         error: memberError
-    } = await supabase.from('ev_member').select('id').eq('id', character.id)
+    } = await supabase.from('ev_member').select('id, user_id').eq('id', character.id).single()
 
     if (memberError) {
         throw new Error('Error fetching member' + JSON.stringify(memberError))
     }
 
-    if (!memberData || memberData.length === 0) {
-
-        await supabase.from('ev_member').insert({id: character.id, character})
-        await supabase.from('ev_member_role').insert({
-            member_id: character.id,
-            role_id: '11b77458-6122-4059-8325-05e64fd3b987'
-        })
+    if (memberData) {
+        return memberData.user_id
     }
+
+
+    const {data: created, error: createdError} = await supabase.from('ev_member')
+        .insert({
+            id: character.id,
+            character
+        }).select('id')
+        .select('user_id')
+        .single()
+
+    if (createdError) {
+        throw new Error('Error creating member' + JSON.stringify(createdError))
+    }
+
+    return created.user_id
+}
+
+async function findMemberWithRole(character: GuildCharacter) {
+    const userId = await selectOrCreateMember(character)
 
     const {
         data: roleData,
@@ -276,19 +238,45 @@ async function findMemberRole(character: GuildCharacter) {
     return {
         //@ts-ignore - roleData.role is not null
         name: roleData.role.name,
+        userId,
         permissions: (permissionsData || []).map((x: { permission: string }) => x.permission)
     }
 }
 
-async function execute(blizzardToken: string) {
-    const account: TokenPayload = await fetchBattleNetWoWAccounts(blizzardToken)
-    const token = await generateToken(account)
+
+async function execute(blizzardToken: string, selectedCharacter: any) {
+
+    const characters = await fetchBattleNetWoWAccounts(blizzardToken)
+    const currentCharacter = characters.find(x => x.id === selectedCharacter.id)
+    if (!currentCharacter) {
+        throw new Error('Selected character not found in the list of characters')
+    }
+    // @ts-ignore - currentCharacter is not null
+    const avatar = await findCharacterAvatar(blizzardToken, currentCharacter?.name, currentCharacter?.realm)
+    const characterWithAvatar = {...currentCharacter, avatar}
+    // @ts-ignore - characterWithAvatar is not null
+    const characterWithRole = await findMemberWithRole(characterWithAvatar)
+    const authId = characterWithRole.userId
+
+    const token = await generateToken({
+        iis: 'https://ijzwizzfjawlixolcuia.supabase.co/auth/v1',
+        role: 'authenticated',
+        iat: getNumericDate(new Date()),
+        exp: getNumericDate(expiresIn),
+        aud: 'authenticated',
+        aal: 'aal1',
+        sub: authId,
+        cid: selectedCharacter.id,
+        wow_account: {...characterWithRole, ...characterWithAvatar},
+    })
+
     const data = {
         expires_in: expiresIn,
         created_at: new Date(),
         expiration_date: new Date(new Date().getTime() + expiresIn * 1000).getTime(),
         access_token: token
     }
+
     return new Response(
         JSON.stringify({...data}),
         {headers: {"Content-Type": "application/json"}},
@@ -296,15 +284,23 @@ async function execute(blizzardToken: string) {
 }
 
 Deno.serve(async (req) => {
-    const {blizzardToken}: { blizzardToken: string } = await req.json()
+    const {blizzardToken, selectedCharacter}: { blizzardToken: string, selectedCharacter: any } = await req.json()
+
     if (!blizzardToken) {
         return new Response(
             JSON.stringify({error: 'blizzardToken is mandatory'}),
             {status: 400, headers: {"Content-Type": "application/json"}},
         )
     }
+
+    if (!selectedCharacter) {
+        return new Response(
+            JSON.stringify({error: 'selectedCharacter is mandatory'}),
+            {status: 400, headers: {"Content-Type": "application/json"}},
+        )
+    }
     try {
-        return await execute(blizzardToken)
+        return await execute(blizzardToken, selectedCharacter)
     } catch (e) {
         return new Response(
             JSON.stringify({error: e.message}),

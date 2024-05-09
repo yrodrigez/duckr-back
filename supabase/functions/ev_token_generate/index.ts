@@ -15,15 +15,14 @@ const allowedRealms = ['lone-wolf']
 
 async function execute(blizzardToken: string, selectedCharacter: { id: number }) {
     const wowAccounts = await fetchWoWAccounts({token: blizzardToken, locale, namespace})
-    const wowAccount = wowAccounts?.wow_accounts.find(account => account.characters.some(x => allowedRealms.includes(x.realm.slug)))
+    const wowAccount = wowAccounts?.wow_accounts.find(account => account.characters.some(x => allowedRealms.includes(x.realm.slug) && x.id === selectedCharacter.id))
     if (!wowAccount) {
-        console.error('No wow account found in allowed realms')
-        throw new Error('No wow account found in allowed realms')
+        throw new Error(`No wow account found in allowed realms id: ${selectedCharacter.id}, characters: ${JSON.stringify(wowAccount)}`)
     }
     const {characters} = wowAccount
     const currentCharacter = characters.find(x => x.id === selectedCharacter.id)
     if (!currentCharacter) {
-        throw new Error('Selected character not found in the list of characters')
+        throw new Error(`Selected character not found in the list of characters id: ${selectedCharacter.id}, characters: ${JSON.stringify(characters)}`)
     }
     const characterDetails = await fetchCharacterDetails({
         token: blizzardToken,
@@ -91,6 +90,8 @@ Deno.serve(async (req) => {
     try {
         return await execute(blizzardToken, selectedCharacter)
     } catch (e) {
+        console.error(`Error generating token for ${selectedCharacter.id} and token ${blizzardToken}`)
+        console.error(`Selected character: ${JSON.stringify(selectedCharacter)}`)
         console.error(e)
         return new Response(
             JSON.stringify({error: e.message}),

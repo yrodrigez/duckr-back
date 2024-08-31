@@ -1,8 +1,8 @@
-import supabase from '../supabase/index.ts'
+import createSupabaseClient from '../supabase/index.ts'
 import type {GuildCharacter} from "./types.ts";
 
 export async function upsertMember(character: GuildCharacter) : Promise<string>{
-
+    const supabase = createSupabaseClient()
     const {data, error} = await supabase.from('ev_member')
         .upsert({
             id: character.id,

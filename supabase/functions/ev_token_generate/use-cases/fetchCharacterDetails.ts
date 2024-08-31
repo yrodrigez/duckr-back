@@ -7,7 +7,7 @@ function mapToWoWCharacter(data: {
   level: number,
   character_class: { name: string },
   last_login_timestamp: number
-  guild?: { name: string, id: number }
+  guild?: { name: string, id: number, rank: number }
 }): WoWCharacter {
   if (!data.id || !data.name || !data.realm || !data.realm.slug || !data.level || !data.character_class || !data.last_login_timestamp) {
     console.error(`Error when mapping data to WoWCharacter in file fetchCharacterDetails.ts: ${JSON.stringify(data)}`)
@@ -35,6 +35,7 @@ function mapToWoWCharacter(data: {
     guild: {
       name: data.guild?.name ?? '',
       id: data.guild?.id ?? 0,
+      rank: data.guild?.rank ?? 6
     },
     character_class: {
       name: data.character_class.name
@@ -63,8 +64,8 @@ export async function fetchCharacterDetails({token, realmSlug, characterName, lo
   });
 
   if (!response.ok) {
-    console.error('Error fetching character details', response.status, response.statusText)
-    throw new Error('Error fetching character details')
+    console.error(`Error fetching character details `, response.status, response.statusText)
+    throw new Error(`Error fetching character details for ${characterName} in realm ${realmSlug} response status: ${response.status}`)
   }
 
   const character = await response.json() as {

@@ -12,11 +12,13 @@ export type WoWCharacter = {
         name: string
     },
     playable_class: {
-        name: string
+        name?: string
+        id?: string
     },
     guild?: {
         name: string,
         id: number
+        rank: number
     },
 }
 

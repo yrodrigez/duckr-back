@@ -1,10 +1,16 @@
-const isDev =  (Deno.env.get('IS_DEV')! ?? '') === 'true'
-import {createClient} from "npm:@supabase/supabase-js"
+import { createClient } from "npm:@supabase/supabase-js";
+const isProd = (Deno.env.get("IS_DEV")! ?? "") !== "true";
+const supabaseUrl = isProd
+    ? Deno.env.get("SUPABASE_URL")!
+    : Deno.env.get("DEV_SUPABASE_URL")!;
+const supabaseServiceRoleKey = isProd
+    ? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    : Deno.env.get("DEV_SUPABASE_SERVICE_ROLE_KEY")!;
 
-const supabaseUrl = isDev ? Deno.env.get("DEV_SUPABASE_URL")! : Deno.env.get("SUPABASE_URL")!
-const supabaseServiceRoleKey = isDev ? Deno.env.get("DEV_SUPABASE_SERVICE_ROLE_KEY")! : Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+export default function () {
 
-export default createClient(
+  return createClient(
     supabaseUrl,
     supabaseServiceRoleKey,
-)
+  );
+}

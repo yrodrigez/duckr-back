@@ -4,3 +4,5 @@
 
 import_map.json
 deno.json
+out
+seed.sql

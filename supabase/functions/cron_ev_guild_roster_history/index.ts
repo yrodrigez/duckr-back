@@ -160,7 +160,7 @@ export async function updateRoster(
         const member = currentMembers[i];
 
         const characterName = member.character.name.toLowerCase();
-        const realmSlug = member.character.realm?.slug ?? "lone-wolf";
+        const realmSlug = member.character.realm?.slug ?? "living-flame";
         const namespace = "profile-classic1x-eu";
         const locale = "en_US";
 

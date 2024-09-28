@@ -1,4 +1,3 @@
-// deno-lint-ignore-file no-explicit-any
 import {getNumericDate} from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import {generateToken} from "./use-cases/generateToken.ts";
 
@@ -6,24 +5,31 @@ import {fetchWoWAccounts} from "./use-cases/fetchWoWAccounts.ts";
 import {fetchCharacterDetails} from "./use-cases/fetchCharacterDetails.ts";
 import {upsertMember} from "./use-cases/upsertMember.ts";
 import {findCharacterAvatar} from "./use-cases/fetchCharacterAvatar.ts";
-import {GuildCharacter} from "./use-cases/types.ts";
+import {GuildCharacter, WoWCharacter} from "./use-cases/types.ts";
 
-const expiresIn = 60 * 60 * 23 // 24 hours
+let expiresIn = 60 * 60 * 23 // 24 hours
 const namespace = 'profile-classic1x-eu'
 const locale = 'en_US'
-const allowedRealms = ['lone-wolf']
+const allowedRealms = ['lone-wolf', 'living-flame']
 
-async function execute(blizzardToken: string, selectedCharacter: { id: number }) {
-    const wowAccounts = await fetchWoWAccounts({token: blizzardToken, locale, namespace})
-    const wowAccount = wowAccounts?.wow_accounts.find(account => account.characters.some(x => allowedRealms.includes(x.realm.slug) && x.id === selectedCharacter.id))
-    if (!wowAccount) {
-        throw new Error(`No wow account found in allowed realms id: ${selectedCharacter.id}, characters: ${JSON.stringify(wowAccount)}`)
+async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, source = "bnet_oauth") {
+    let currentCharacter : WoWCharacter | undefined;
+    if(source !== 'temporal') {
+        const wowAccounts = await fetchWoWAccounts({token: blizzardToken, locale, namespace})
+        const wowAccount = wowAccounts?.wow_accounts.find(account => account.characters.some(x => allowedRealms.includes(x.realm.slug) && x.id === selectedCharacter.id))
+        if (!wowAccount) {
+            throw new Error(`No wow account found in allowed realms id: ${selectedCharacter.id}, characters: ${JSON.stringify(wowAccount)}`)
+        }
+        const {characters} = wowAccount
+        currentCharacter = characters.find(x => x.id === selectedCharacter.id)
+        if (!currentCharacter) {
+            throw new Error(`Selected character not found in the list of characters id: ${selectedCharacter.id}, characters: ${JSON.stringify(characters)}`)
+        }
+    } else {
+        expiresIn = 60 * 60 // 1 hour
+        currentCharacter = selectedCharacter
     }
-    const {characters} = wowAccount
-    const currentCharacter = characters.find(x => x.id === selectedCharacter.id)
-    if (!currentCharacter) {
-        throw new Error(`Selected character not found in the list of characters id: ${selectedCharacter.id}, characters: ${JSON.stringify(characters)}`)
-    }
+
     const characterDetails = await fetchCharacterDetails({
         token: blizzardToken,
         realmSlug: currentCharacter.realm.slug,
@@ -43,7 +49,7 @@ async function execute(blizzardToken: string, selectedCharacter: { id: number })
     })
 
     const characterWithAvatar = {...characterDetails, avatar} as GuildCharacter
-    const authId = await upsertMember(characterWithAvatar)
+    const authId = await upsertMember(characterWithAvatar, source)
 
     const token = await generateToken({
         iis: 'https://ijzwizzfjawlixolcuia.supabase.co/auth/v1',
@@ -54,7 +60,7 @@ async function execute(blizzardToken: string, selectedCharacter: { id: number })
         aal: 'aal1',
         sub: authId,
         cid: characterWithAvatar.id,
-        wow_account: {userId: authId, ...characterWithAvatar},
+        wow_account: {userId: authId, ...characterWithAvatar, source, isTemporal: source === 'temporal'},
         token: blizzardToken
     })
 
@@ -65,14 +71,17 @@ async function execute(blizzardToken: string, selectedCharacter: { id: number })
         access_token: token
     }
 
+    console.log(`Generated token for ${selectedCharacter.id} and token ${blizzardToken} with source ${source}`)
     return new Response(
         JSON.stringify({...data}),
         {headers: {"Content-Type": "application/json"}},
     )
 }
 
-Deno.serve(async (req) => {
-    const {blizzardToken, selectedCharacter}: { blizzardToken: string, selectedCharacter: any } = await req.json()
+Deno.serve(async (req: Request) => {
+    const {blizzardToken, selectedCharacter, source = "bnet_oauth"}: { blizzardToken: string, selectedCharacter: WoWCharacter, source?: string } = await req.json()
+
+    console.log(`at ${Date.now()} Generating token for ${selectedCharacter.id} and token ${blizzardToken} with source ${source}`)
 
     if (!blizzardToken) {
         return new Response(
@@ -88,14 +97,15 @@ Deno.serve(async (req) => {
         )
     }
     try {
-        return await execute(blizzardToken, selectedCharacter)
+        return await execute(blizzardToken, selectedCharacter, source)
     } catch (e) {
         console.error(`Error generating token for ${selectedCharacter.id} and token ${blizzardToken}`)
         console.error(`Selected character: ${JSON.stringify(selectedCharacter)}`)
-        console.error(e)
-        return new Response(
-            JSON.stringify({error: e.message}),
-            {status: 500, headers: {"Content-Type": "application/json"}},
+        console.error(e.message)
+
+        return Response.json(
+            {error: e.message},
+            {status: 500},
         )
     }
 })

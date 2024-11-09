@@ -6,6 +6,7 @@ import {fetchCharacterDetails} from "./use-cases/fetchCharacterDetails.ts";
 import {upsertMember} from "./use-cases/upsertMember.ts";
 import {findCharacterAvatar} from "./use-cases/fetchCharacterAvatar.ts";
 import {GuildCharacter, WoWCharacter} from "./use-cases/types.ts";
+import {isAdmin} from "./use-cases/isAdmin.ts";
 
 let expiresIn = 60 * 60 * 23 // 24 hours
 const namespace = 'profile-classic1x-eu'
@@ -50,7 +51,7 @@ async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, s
 
     const characterWithAvatar = {...characterDetails, avatar} as GuildCharacter
     const authId = await upsertMember(characterWithAvatar, source)
-
+    const characterAdmin =  await isAdmin(characterDetails.id)
     const token = await generateToken({
         iis: 'https://ijzwizzfjawlixolcuia.supabase.co/auth/v1',
         role: 'authenticated',
@@ -60,7 +61,7 @@ async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, s
         aal: 'aal1',
         sub: authId,
         cid: characterWithAvatar.id,
-        wow_account: {userId: authId, ...characterWithAvatar, source, isTemporal: source === 'temporal'},
+        wow_account: {userId: authId, ...characterWithAvatar, source, isTemporal: source === 'temporal', isAdmin: characterAdmin},
         token: blizzardToken
     })
 

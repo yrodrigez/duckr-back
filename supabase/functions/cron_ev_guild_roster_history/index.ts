@@ -4,7 +4,9 @@ import { fetchCharacterDetails } from "../ev_token_generate/use-cases/fetchChara
 import { findCharacterAvatar } from "../ev_token_generate/use-cases/fetchCharacterAvatar.ts";
 import { GuildCharacter } from "../ev_token_generate/use-cases/types.ts";
 import { GuildRosterResponse, SupabaseMemberResponse } from "./types.ts";
-
+const CURRENT_REALM_SLUG = "living-flame";
+const CURRENT_REALM_ID = 5827;
+const CURRENT_GUILD_ID = 2410263;
 const supabase = createSupabaseClient();
 
 function getClassNumberFromName(name: string) {
@@ -53,6 +55,8 @@ export function transformMembersForHistory(data: GuildCharacter[]) {
         });
 }
 
+
+
 export async function fetchGuildRoster(
     { token }: { token: string },
 ): Promise<{
@@ -64,6 +68,7 @@ export async function fetchGuildRoster(
     const { data, error } = await supabase
         .from("ev_member")
         .select("character")
+        .eq("character->realm->>slug", CURRENT_REALM_SLUG)
         .order("updated_at", { ascending: false })
         .returns<SupabaseMemberResponse[]>();
 
@@ -72,16 +77,16 @@ export async function fetchGuildRoster(
         throw new Error("Error fetching guild roster");
     }
 
-    const getGuildMembers = await getBattleNetGuildMembers({
+    const guildMembers = await getBattleNetGuildMembers({
         token,
-        realmId: 5826,
-        guildId: 2239011,
+        realmId: CURRENT_REALM_ID,
+        guildId: CURRENT_GUILD_ID,
         namespace: "profile-classic1x-eu",
         locale: "en_US",
     });
 
     const mergedUniqueMembers = new Map([
-        ...getGuildMembers.map((member) => {
+        ...guildMembers.map((member) => {
             return {
                 character: {
                     name: member.character.name,
@@ -126,7 +131,8 @@ export async function getBattleNetGuildMembers(
             request.status,
             request.statusText,
         );
-        throw new Error("Error fetching guild members");
+        // throw new Error("Error fetching guild members");
+        return []
     }
 
     const data = await request.json() as GuildRosterResponse;
@@ -160,7 +166,7 @@ export async function updateRoster(
         const member = currentMembers[i];
 
         const characterName = member.character.name.toLowerCase();
-        const realmSlug = member.character.realm?.slug ?? "living-flame";
+        const realmSlug = CURRENT_REALM_SLUG;
         const namespace = "profile-classic1x-eu";
         const locale = "en_US";
 
@@ -175,7 +181,7 @@ export async function updateRoster(
                         namespace,
                     });
                 } catch (e) {
-                    console.error("Error fetching character details", e);
+                    console.error(`Error fetching character details ignoring ${characterName}`, e.message);
                     return null;
                 }
             })(),
@@ -212,7 +218,10 @@ async function execute() {
     const token = tokenResponse.token;
 
     const members = await fetchGuildRoster({ token });
-
+    const gizmo = members.find((member) => member.character.name === "Gizmogon");
+    if(gizmo) {
+        console.log("Gizmogon", gizmo);
+    }
     const updatedRoster = await updateRoster(token, members);
 
     const { error: updateError } = await supabase
@@ -243,6 +252,7 @@ async function execute() {
 }
 
 Deno.serve(async () => {
+    console.log("Starting cron_ev_guild_roster_history");
     try {
         await execute();
         console.log("Success");

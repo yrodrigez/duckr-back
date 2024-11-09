@@ -1,4 +1,5 @@
 import type {WoWCharacter} from "./types.ts";
+const CURRENT_FACTION_TYPE = "ALLIANCE";
 
 function mapToWoWCharacter(data: {
   id: number,
@@ -75,7 +76,15 @@ export async function fetchCharacterDetails({token, realmSlug, characterName, lo
     level: number,
     character_class: { name: string },
     last_login_timestamp: number
+    guild?: { name: string, id: number, rank: number }
+    faction?: { type?: string }
   };
+
+
+  if(character?.faction?.type !== CURRENT_FACTION_TYPE) {
+    console.log(`Character ${characterName} is not from the correct faction`)
+    throw new Error(`Character ${characterName} is not from the correct faction`)
+  }
 
   if (!character) {
     console.error('Character not found', characterName)

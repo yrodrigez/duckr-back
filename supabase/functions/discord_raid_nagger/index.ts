@@ -3,7 +3,7 @@ import { type SupabaseClient } from "npm:@supabase/supabase-js";
 import createClient from "../ev_token_generate/supabase/index.ts";
 import { Embed } from "https://deno.land/x/harmony@v2.9.1/mod.ts";
 import { toZonedTime } from "https://esm.sh/date-fns-tz";
-import { addDays, differenceInHours } from "https://esm.sh/date-fns";
+import { addDays, differenceInHours, differenceInMinutes } from "https://esm.sh/date-fns";
 
 const timeZone = "Europe/Madrid";
 
@@ -41,7 +41,7 @@ async function generateRaidReminderMessage(
   dictator: string,
 ): Promise<string> {
   const prompt =
-    `Compose an epic and bombastic message for a raid group named Everlasting Vendetta to subscribe on the "${raidName}" raid, which starts in ${startsIn}. Encourage them to subscribe in the web, and unleash their fury. the message should not exceed 1000 characters. mocking ${dictator} president in a funny dictatorship way. the subscribe link is ${link}. is a discord message and should always mention @everyone smoothly.`;
+    `Compose an epic and bombastic message for a raid group named Everlasting Vendetta to subscribe on the "${raidName}" raid, which starts in ${startsIn} hours. Encourage them to subscribe in the web, and unleash their fury. the message should not exceed 1000 characters. mocking ${dictator} president in a funny dictatorship way. the subscribe link is ${link}. is a discord message and should always mention @everyone smoothly.`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -73,7 +73,7 @@ async function generateRaidReminderMessage(
     console.error("Error fetching AI response", data);
   }
   return message ||
-    `The time has come, heroes! ${raidName} awaits, and we’re starting in just ${startsIn}! \n\nGear up, review your tactics, and prepare to unleash fury! \n${reminderMessage} \n\n${link}`;
+    `The time has come, @everyone! ${raidName} awaits, and we’re starting in just ${startsIn}! \n\nGear up, review your tactics, and prepare to unleash fury! \n${reminderMessage} \n\n${link}`;
 }
 
 const REMINDER_TYPES = {
@@ -82,6 +82,7 @@ const REMINDER_TYPES = {
   RAID_IN_24_HOUR: 3,
   RAID_IN_6_HOUR: 2,
   RAID_IN_1_HOUR: 1,
+  RAID_IN_30_minutes: 6,
   RAID_IN_15_MINUTES: 0,
 };
 
@@ -104,7 +105,7 @@ const REMINDER_CONFIGS: ReminderConfig[] = [
   },
   {
     type: REMINDER_TYPES.RAID_IN_15_MINUTES,
-    message: `Invites starting soon!`,
+    message: `Invites started!`,
     interval: 0.25,
   },
   {
@@ -121,6 +122,11 @@ const REMINDER_CONFIGS: ReminderConfig[] = [
     type: REMINDER_TYPES.RAID_IN_96_HOUR,
     message: `Sign up now!`,
     interval: 96,
+  },
+  {
+    type: REMINDER_TYPES.RAID_IN_30_minutes,
+    message: `Invites starting soon!`,
+    interval: 0.5,
   },
 ];
 
@@ -182,7 +188,7 @@ async function fetchUpcomingRaids(
       "id, raid_date, time, raid:ev_raid(name, image), participants:ev_raid_participant(is_confirmed)",
     )
     .gte("raid_date", now.toISOString())
-    .lte("raid_date", addDays(now, 2).toISOString())
+    .lte("raid_date", addDays(now, 4).toISOString())
     .order("raid_date", { ascending: true })
     .returns<RaidReset[]>();
 
@@ -207,7 +213,13 @@ async function processRaidReminders(
     timeZone,
   );
 
-  const timeUntilRaidInHours = differenceInHours(raidDate, now);
+  let isMinutes = false;
+  let timeUntilRaidInHours = differenceInHours(raidDate, now);
+    if (timeUntilRaidInHours < 1) {
+      isMinutes = true;
+      timeUntilRaidInHours = differenceInMinutes(raidDate, now) / 60;
+    }
+
 
   for (const reminder of REMINDER_CONFIGS) {
     if (!shouldSendReminder(timeUntilRaidInHours, reminder.interval)) {
@@ -219,11 +231,15 @@ async function processRaidReminders(
 
     // Check if a reminder has been sent in the last 30 minutes
     const canSend = await canSendReminder(supabase, raid.id, reminder.type);
-
+    if(!canSend) {
+        console.log(
+            `Reminder recently sent for raid reset ID ${raid.id}, skipping.`,
+        );
+    }
     if (canSend) {
       const link = `https://www.everlastingvendetta.com/raid/${raid.id}`;
-      const startsIn = timeUntilRaidInHours < 1
-        ? `${Math.round(timeUntilRaidInHours * 60)} minutes`
+      const startsIn = isMinutes
+        ? `${Math.round(timeUntilRaidInHours)} minutes`
         : `${Math.round(timeUntilRaidInHours)} hours`;
 
       const dictator = pickDictator();
@@ -271,12 +287,13 @@ function shouldSendReminder(
   const executionIntervalInHours = 0.25; // 15 minutes
   const lowerBound = reminderInterval - executionIntervalInHours;
   const upperBound = reminderInterval;
+
+
+  const canSend = timeUntilRaidInHours <= upperBound && timeUntilRaidInHours > lowerBound;
   console.log(
-    `Checking if reminder should be sent, time until raid: ${timeUntilRaidInHours} hours, interval: ${reminderInterval} hours.`,
+    `Time until raid: ${timeUntilRaidInHours} hours, reminder interval: ${reminderInterval}, can send: ${canSend}`,
   );
-  console.log(`Lower bound: ${lowerBound}, upper bound: ${upperBound}`);
-  return timeUntilRaidInHours <= upperBound &&
-    timeUntilRaidInHours > lowerBound;
+  return canSend
 }
 
 /**
@@ -300,7 +317,7 @@ async function canSendReminder(
     throw error;
   }
 
-  if (data && data.length > 0) {
+  if (data?.length > 0) {
     return false;
   }
 

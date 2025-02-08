@@ -81,10 +81,10 @@ export async function fetchCharacterDetails({token, realmSlug, characterName, lo
   };
 
 
-  if(character?.faction?.type !== CURRENT_FACTION_TYPE) {
+  /*if(character?.faction?.type !== CURRENT_FACTION_TYPE) {
     console.log(`Character ${characterName} is not from the correct faction`)
     throw new Error(`Character ${characterName} is not from the correct faction`)
-  }
+  }*/
 
   if (!character) {
     console.error('Character not found', characterName)

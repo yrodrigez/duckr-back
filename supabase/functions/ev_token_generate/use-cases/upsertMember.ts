@@ -1,7 +1,7 @@
 import createSupabaseClient from '../supabase/index.ts'
 import type {GuildCharacter} from "./types.ts";
 
-export async function upsertMember(character: GuildCharacter, source: string) : Promise<string>{
+export async function upsertMember(character: GuildCharacter, source: string, wow_account_id: number = 0) : Promise<string>{
     const supabase = createSupabaseClient()
 
     const {data: member, error: memberError} = await supabase
@@ -23,14 +23,26 @@ export async function upsertMember(character: GuildCharacter, source: string) : 
         return member[0].user_id
     }
 
+    const upsertPayload: any = {
+        id: character.id,
+        character,
+        updated_at: new Date(),
+        registration_source: source,
+    }
+
+    if(wow_account_id) {
+        await supabase.from('wow_account')
+            .upsert({
+                id: wow_account_id,
+            }).select('id')
+            .single()
+
+        upsertPayload['wow_account_id'] = wow_account_id
+    }
+
 
     const {data, error} = await supabase.from('ev_member')
-        .upsert({
-            id: character.id,
-            character,
-            updated_at: new Date(),
-            registration_source: source || currentSource
-        }).select('id, user_id')
+        .upsert(upsertPayload).select('id, user_id')
         .single()
 
     if (error) {

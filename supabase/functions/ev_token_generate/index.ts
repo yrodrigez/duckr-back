@@ -7,11 +7,27 @@ import {upsertMember} from "./use-cases/upsertMember.ts";
 import {findCharacterAvatar} from "./use-cases/fetchCharacterAvatar.ts";
 import {GuildCharacter, WoWCharacter} from "./use-cases/types.ts";
 import {isAdmin} from "./use-cases/isAdmin.ts";
+import {fetchRoles} from "./use-cases/fetchRoles.ts";
+import { fetchPermissions } from "./use-cases/fetchPermissions.ts";
 
 let expiresIn = 60 * 60 * 23 // 24 hours
 const namespace = 'profile-classic1x-eu'
 const locale = 'en_US'
 const allowedRealms = ['lone-wolf', 'living-flame']
+
+async function fetchCharacterDetailsWithAvatar({token, realmSlug, characterName, locale, namespace}: { token: string, realmSlug: string, characterName: string, locale: string, namespace: string }) {
+
+    const [characterDetails, avatar] = await Promise.all([
+        fetchCharacterDetails({token, realmSlug, characterName, locale, namespace}),
+        findCharacterAvatar({token, characterName, realmSlug, locale, namespace})
+    ])
+
+    if (!characterDetails) {
+        throw new Error('Character not found')
+    }
+
+    return {...characterDetails, avatar} as GuildCharacter
+}
 
 async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, source = "bnet_oauth") {
     let currentCharacter : WoWCharacter | undefined;
@@ -21,37 +37,50 @@ async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, s
         if (!wowAccount) {
             throw new Error(`No wow account found in allowed realms id: ${selectedCharacter.id}, characters: ${JSON.stringify(wowAccount)}`)
         }
-        const {characters} = wowAccount
+        const {characters,id} = wowAccount
         currentCharacter = characters.find(x => x.id === selectedCharacter.id)
         if (!currentCharacter) {
             throw new Error(`Selected character not found in the list of characters id: ${selectedCharacter.id}, characters: ${JSON.stringify(characters)}`)
         }
+
+        try {
+          await Promise.all(characters.filter(x => x.level > 19).map(async (character) => {
+            const characterWithAvatar = await fetchCharacterDetailsWithAvatar({
+              token: blizzardToken,
+              realmSlug: character.realm.slug,
+              characterName: character.name,
+              locale,
+              namespace
+            })
+
+            await upsertMember(characterWithAvatar, source, id)
+          }))
+        } catch (e) {
+            // This is a non-blocking error, we don't want to block the token generation
+            console.error(`Error upserting characters for account ${id}`)
+            console.error(e)
+        }
+
     } else {
         expiresIn = 60 * 60 // 1 hour
         currentCharacter = selectedCharacter
     }
 
-    const characterDetails = await fetchCharacterDetails({
+    const characterWithAvatar = await fetchCharacterDetailsWithAvatar({
         token: blizzardToken,
         realmSlug: currentCharacter.realm.slug,
         characterName: currentCharacter.name,
         locale,
         namespace
     })
-    if (!characterDetails) {
-        throw new Error('Character not found')
-    }
-    const avatar = await findCharacterAvatar({
-        token: blizzardToken,
-        characterName: characterDetails.name,
-        realmSlug: characterDetails.realm.slug,
-        locale,
-        namespace
-    })
 
-    const characterWithAvatar = {...characterDetails, avatar} as GuildCharacter
-    const authId = await upsertMember(characterWithAvatar, source)
-    const characterAdmin =  await isAdmin(characterDetails.id)
+    const [authId, characterAdmin, customRoles] = await Promise.all([
+        upsertMember(characterWithAvatar, source),
+        isAdmin(characterWithAvatar.id),
+        fetchRoles(characterWithAvatar.id)
+    ])
+
+    const permissions = await fetchPermissions(customRoles)
     const token = await generateToken({
         iis: 'https://ijzwizzfjawlixolcuia.supabase.co/auth/v1',
         role: 'authenticated',
@@ -62,7 +91,9 @@ async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, s
         sub: authId,
         cid: characterWithAvatar.id,
         wow_account: {userId: authId, ...characterWithAvatar, source, isTemporal: source === 'temporal', isAdmin: characterAdmin},
-        token: blizzardToken
+        token: blizzardToken,
+        custom_roles: customRoles,
+        permissions
     })
 
     const data = {

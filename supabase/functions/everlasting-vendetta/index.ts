@@ -47,7 +47,7 @@ async function saveTokenToDatabase(supabase: any, accessToken: any, expiresIn: a
     return data;
 }
 
-async function fetchWoWProfileToken(supabase: any) {
+export async function fetchWoWProfileToken(supabase: any) {
     let tokenRecord = await getTokenFromDatabase(supabase);
 
     if (!tokenRecord || hasTokenExpired(tokenRecord)) {

@@ -41,7 +41,7 @@ async function generateRaidReminderMessage(
   dictator: string,
 ): Promise<string> {
   const prompt =
-    `Compose an epic and bombastic message for a raid group named Everlasting Vendetta to subscribe on the "${raidName}" raid, which starts in ${startsIn} hours. Encourage them to subscribe in the web, and unleash their fury. the message should not exceed 1000 characters. mocking ${dictator} president in a funny dictatorship way. the subscribe link is ${link}. is a discord message and should always mention @everyone smoothly.`;
+    `Compose an epic and bombastic message for a raid group named Everlasting Vendetta to subscribe on the "${raidName}" raid, which starts in ${startsIn} hours. Encourage them to subscribe in the web, and unleash their fury. the message should not exceed 1000 characters, imitating ${dictator}'s president speech in a funny black humour way. the subscribe link is ${link}. This a discord message and should always mention @everyone smoothly.`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",

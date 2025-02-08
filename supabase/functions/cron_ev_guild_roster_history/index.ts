@@ -69,6 +69,7 @@ export async function fetchGuildRoster(
         .from("ev_member")
         .select("character")
         .eq("character->realm->>slug", CURRENT_REALM_SLUG)
+        .gte("character->>level", 20)
         .order("updated_at", { ascending: false })
         .returns<SupabaseMemberResponse[]>();
 
@@ -127,7 +128,7 @@ export async function getBattleNetGuildMembers(
 
     if (!request.ok) {
         console.error(
-            "Error fetching guild members",
+            "Error fetching battle.net guild members",
             request.status,
             request.statusText,
         );
@@ -153,6 +154,47 @@ export async function getBattleNetGuildMembers(
 function delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+async function updateMember(
+    token: string,
+    member: { character: { realm?: { slug: string }; name: string } },
+) {
+    const characterName = member.character.name.toLowerCase();
+    const realmSlug = CURRENT_REALM_SLUG;
+    const namespace = "profile-classic1x-eu";
+    const locale = "en_US";
+
+    const [updatedMember, avatar] = await Promise.all([
+        (async () => {
+            try {
+                return await fetchCharacterDetails({
+                    token,
+                    realmSlug,
+                    characterName,
+                    locale,
+                    namespace,
+                });
+            } catch (e) {
+                console.error(`Error fetching character details ignoring ${characterName}`, e.message);
+                return null;
+            }
+        })(),
+        findCharacterAvatar({
+            token,
+            realmSlug,
+            characterName,
+            locale,
+            namespace,
+        }),
+    ]);
+
+    if (updatedMember) {
+        return { ...updatedMember, avatar };
+    }
+
+    return null;
+}
+
 /*
  will update member by member if its guild has changed
 * */
@@ -162,46 +204,17 @@ export async function updateRoster(
 ) {
     const updatedMembers: GuildCharacter[] = [];
 
-    for (let i = 0; i < currentMembers.length; i++) {
-        const member = currentMembers[i];
+    for (let i = 0; i < currentMembers.length; i+=3) {
+        const members = currentMembers.slice(i, i+3);
 
-        const characterName = member.character.name.toLowerCase();
-        const realmSlug = CURRENT_REALM_SLUG;
-        const namespace = "profile-classic1x-eu";
-        const locale = "en_US";
+        const results = await Promise.all(members.map(async member => await updateMember(token, member)));
 
-        const [updatedMember, avatar] = await Promise.all([
-            (async () => {
-                try {
-                    return await fetchCharacterDetails({
-                        token,
-                        realmSlug,
-                        characterName,
-                        locale,
-                        namespace,
-                    });
-                } catch (e) {
-                    console.error(`Error fetching character details ignoring ${characterName}`, e.message);
-                    return null;
-                }
-            })(),
-            findCharacterAvatar({
-                token,
-                realmSlug,
-                characterName,
-                locale,
-                namespace,
-            }),
-        ]);
-
-        // Delay the next iteration by 500ms
-        if (i < currentMembers.length - 1) {
+        // Delay the next iteration by 300ms
+        if (i + 3 < currentMembers.length) {
             await delay(300);
         }
 
-        if (updatedMember) {
-            updatedMembers.push({ ...updatedMember, avatar });
-        }
+        updatedMembers.push(...results.filter(Boolean) as GuildCharacter[]);
     }
 
     return updatedMembers;
@@ -218,10 +231,6 @@ async function execute() {
     const token = tokenResponse.token;
 
     const members = await fetchGuildRoster({ token });
-    const gizmo = members.find((member) => member.character.name === "Gizmogon");
-    if(gizmo) {
-        console.log("Gizmogon", gizmo);
-    }
     const updatedRoster = await updateRoster(token, members);
 
     const { error: updateError } = await supabase

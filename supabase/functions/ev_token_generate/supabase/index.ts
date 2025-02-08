@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2.47.10";
 const isProd = (Deno.env.get("IS_DEV")! ?? "") !== "true";
 const supabaseUrl = isProd
     ? Deno.env.get("SUPABASE_URL")!

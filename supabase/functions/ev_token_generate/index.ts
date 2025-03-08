@@ -32,6 +32,7 @@ async function fetchCharacterDetailsWithAvatar({token, realmSlug, characterName,
 async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, source = "bnet_oauth") {
     let currentCharacter : WoWCharacter | undefined;
     if(source !== 'temporal') {
+        console.log(`Fetching wow accounts for token selectedCharacter.id: ${selectedCharacter.id} with source ${source}`)
         const wowAccounts = await fetchWoWAccounts({token: blizzardToken, locale, namespace})
         const wowAccount = wowAccounts?.wow_accounts.find(account => account.characters.some(x => allowedRealms.includes(x.realm.slug) && x.id === selectedCharacter.id))
         if (!wowAccount) {
@@ -62,6 +63,7 @@ async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, s
         }
 
     } else {
+        console.log(`Fetching character details for token selectedCharacter.id: ${selectedCharacter.id} with source ${source}`)
         expiresIn = 60 * 60 // 1 hour
         currentCharacter = selectedCharacter
     }
@@ -73,12 +75,13 @@ async function execute(blizzardToken: string, selectedCharacter: WoWCharacter, s
         locale,
         namespace
     })
-
+    console.log(`Character details for ${selectedCharacter.id} and token ${blizzardToken} with source ${source}: ${JSON.stringify(characterWithAvatar)}`)
     const [authId, characterAdmin, customRoles] = await Promise.all([
         upsertMember(characterWithAvatar, source),
         isAdmin(characterWithAvatar.id),
         fetchRoles(characterWithAvatar.id)
     ])
+    console.log(`Roles for ${selectedCharacter.id} and token ${blizzardToken} with source ${source}: ${JSON.stringify(customRoles)}`)
 
     const permissions = await fetchPermissions(customRoles)
     const token = await generateToken({

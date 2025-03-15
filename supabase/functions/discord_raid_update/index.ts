@@ -6,6 +6,7 @@ const DISC_RAGNAROS = Deno.env.get("DISC_RAGNAROS")!;
 const DISC_CTHUN = Deno.env.get("DISC_CTHUN")!;
 const DISC_NEFARIAN = Deno.env.get("DISC_NEFARIAN")!;
 const DISC_ZUL = Deno.env.get("DISC_ZUL")!;
+const DISC_BALNAZZAR = Deno.env.get("DISC_BALNAZZAR")!;
 
 /**
  * Returns which WoW boss/personality and a placeholder thumbnail to use,
@@ -45,6 +46,11 @@ function getAnnouncerInfo(raidName: string | undefined) {
         return {
             bossName: "Ragnaros",
             webhook: DISC_RAGNAROS,
+        };
+    } else if (lowerRaid.includes("scarlet")) {
+        return {
+            bossName: "Dreadlord Balnazzar",
+            webhook: DISC_BALNAZZAR,
         };
     }
     // Default fallback if no match:

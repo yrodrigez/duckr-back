@@ -92,7 +92,7 @@ const execute = async (req: Request) => {
 					rarity: quality[details?.itemDetails?.quality?.type?.toUpperCase()] ?? 0,
 				}
 			})));
-
+			//console.log (completeItems)
 			const gs = calculateTotalGearScore(completeItems.filter((item: any) => !!item && item.ilvl > 0 && item.type?.indexOf('INVTYPE_') !== -1));
 			const color = getColorForGearScoreText(gs);
 			const {error} = await supabase.from('gs_cache').upsert({md5, gs, color});

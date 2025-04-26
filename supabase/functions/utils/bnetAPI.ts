@@ -6,6 +6,7 @@ import {
 } from "./constants.ts";
 import {type SupabaseClient} from "npm:@supabase/supabase-js@2.47.10";
 import axios from "npm:axios@1.6.7";
+import {getInventoryType} from "../ev_token_generate/use-cases/getInventoryType.ts";
 
 export async function fetchEquipment(characterName: string, token: string)  {
 	if (!characterName) {
@@ -69,9 +70,9 @@ async function fetchItemDetails(token: string, itemId: number) {
 
 		itemDetails = data;
 	} catch (e) {
-		console.error('Error fetching item details:', itemId, e)
+		console.error('Error fetching item details:', itemId, /*e*/)
 		console.error('try this in postman', url, 'with token', token)
-		return itemDetails
+		return {}
 	}
 	if (itemDetails.quality.level === 0) {
 		console.error('Item quality not found for item:', itemId)
@@ -101,15 +102,21 @@ async function fetchWoWHeadItem(itemId: number) {
 		'artifact',
 		'heirloom',
 	][data.quality ?? 0]
-
+	const itemLevel = data.tooltip.match(/Item\s*Level\s*(?:<!--ilvl-->)?\s*(\d+)/i) ?? [0, 0]
 	return {
 		icon: `https://wow.zamimg.com/images/wow/icons/medium/${data.icon}.jpg`,
-		quality: data.quality,
+		//quality: data.quality,
 		qualityName: qualityName,
 		name: data.name,
-		id: data.id,
+		id: itemId,
 		tooltip: data.tooltip,
-		spells: data.spells
+		spells: data.spells,
+		level: itemLevel ? parseInt(itemLevel[1] as string) : 0,
+		quality: {
+			type: qualityName.toUpperCase(),
+			name: (qualityName[0].toUpperCase() + qualityName.slice(1)),
+		},
+		type: getInventoryType(data.tooltip),
 	}
 }
 

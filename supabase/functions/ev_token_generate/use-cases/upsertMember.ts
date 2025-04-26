@@ -15,7 +15,7 @@ export async function upsertMember(character: GuildCharacter, source: string, wo
         throw new Error('Error fetching member' + JSON.stringify(memberError))
     }
     const currentMember = member?.[0]
-    const currentSource = currentMember.registration_source
+    const currentSource = currentMember?.registration_source
     if (member && member.length > 0 && source === 'temporal') {
         if (currentSource?.toLowerCase().indexOf('oauth') !== -1) {
             throw new Error(`Character ${character.id} already exists with a different source: ${currentSource}`)

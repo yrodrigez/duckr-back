@@ -62,7 +62,7 @@ function getAnnouncerInfo(raidName: string | undefined) {
 
 
 // 1) Helper function to call OpenAI with role-based messages
-async function sendPromptToAI(messages: { role: string; content: string }[]): Promise<string> {
+export async function sendPromptToAI(messages: { role: string; content: string }[]): Promise<string> {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {

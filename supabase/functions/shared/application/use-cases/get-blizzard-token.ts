@@ -10,7 +10,7 @@ export class GetBlizzardToken {
 		private tokenRepository: ITokenRepository,
 	) {}
 
-	async execute(): Promise<string | null> {
+	async execute(): Promise<string> {
 		try {
 			this.logger.debug("Starting Blizzard token retrieval");
 

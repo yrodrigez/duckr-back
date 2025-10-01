@@ -1,0 +1,18 @@
+{
+  "importMap": "import_map.json",
+
+  "lint": {
+    "rules": {
+      "tags": ["recommended"],
+      "include": ["camelcase", "no-unused-vars", "filename-case"],
+      "exclude": []
+    }
+  },
+  "fmt": {
+    "options": {
+      "indentWidth": 4,
+      "useTabs": false
+    }
+  },
+  "unstable": []
+}

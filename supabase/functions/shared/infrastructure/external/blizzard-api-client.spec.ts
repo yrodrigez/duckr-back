@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { BlizzardApiClient } from "./blizzard-api-client.ts";
+import { BlizzardOauthService } from "./blizzard-generic-token-api-client.ts";
 
 // Store original fetch
 const originalFetch = globalThis.fetch;
@@ -18,13 +18,13 @@ function setupEnv() {
 }
 
 Deno.test("BlizzardApiClient - constructor - should initialize with default values", () => {
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   assertEquals(client.allowedRealms, ["living-flame", "spineshatter"]);
   assertEquals(client.allowedGuilds, ["everlasting-vendetta"]);
 });
 
 Deno.test("BlizzardApiClient - constructor - should accept custom parameters", () => {
-  const customClient = new BlizzardApiClient(
+  const customClient = new BlizzardOauthService(
     "https://custom.api.com",
     "https://custom.oauth.com",
     "test-token"
@@ -33,7 +33,7 @@ Deno.test("BlizzardApiClient - constructor - should accept custom parameters", (
 });
 
 Deno.test("BlizzardApiClient - authHeaders - should throw error when token is not provided", () => {
-  const clientWithoutToken = new BlizzardApiClient();
+  const clientWithoutToken = new BlizzardOauthService();
 
   try {
     (clientWithoutToken as any).authHeaders;
@@ -44,7 +44,7 @@ Deno.test("BlizzardApiClient - authHeaders - should throw error when token is no
 });
 
 Deno.test("BlizzardApiClient - authHeaders - should create proper authorization header when token is provided", () => {
-  const clientWithToken = new BlizzardApiClient(
+  const clientWithToken = new BlizzardOauthService(
     "https://eu.api.blizzard.com",
     "https://oauth.battle.net",
     "test-access-token"
@@ -57,7 +57,7 @@ Deno.test("BlizzardApiClient - authHeaders - should create proper authorization 
 Deno.test("BlizzardApiClient - refreshTokenHeaders - should create proper headers for token refresh", () => {
   setupEnv();
 
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   const headers = (client as any).refreshTokenHeaders;
   assertEquals(headers.get("Content-Type"), "application/x-www-form-urlencoded");
 
@@ -68,7 +68,7 @@ Deno.test("BlizzardApiClient - refreshTokenHeaders - should create proper header
 Deno.test("BlizzardApiClient - fetchToken - should successfully fetch a new token", async () => {
   setupEnv();
 
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   const mockResponse = {
     access_token: "new-access-token",
     token_type: "Bearer",
@@ -94,7 +94,7 @@ Deno.test("BlizzardApiClient - fetchToken - should successfully fetch a new toke
 Deno.test("BlizzardApiClient - fetchToken - should throw error when API returns error response", async () => {
   setupEnv();
 
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   mockFetch(
     new Response("Unauthorized", {
       status: 401,
@@ -114,7 +114,7 @@ Deno.test("BlizzardApiClient - fetchToken - should throw error when API returns 
 Deno.test("BlizzardApiClient - fetchToken - should throw error when API returns invalid JSON", async () => {
   setupEnv();
 
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   mockFetch(
     new Response("Invalid JSON", { status: 200 })
   );
@@ -128,14 +128,14 @@ Deno.test("BlizzardApiClient - fetchToken - should throw error when API returns 
 });
 
 Deno.test("BlizzardApiClient - constants - should have valid realm names", () => {
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   assertEquals(client.allowedRealms.length, 2);
   assertEquals(client.allowedRealms.includes("living-flame"), true);
   assertEquals(client.allowedRealms.includes("spineshatter"), true);
 });
 
 Deno.test("BlizzardApiClient - constants - should have valid guild names", () => {
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   assertEquals(client.allowedGuilds.length, 1);
   assertEquals(client.allowedGuilds.includes("everlasting-vendetta"), true);
 });
@@ -143,7 +143,7 @@ Deno.test("BlizzardApiClient - constants - should have valid guild names", () =>
 Deno.test("BlizzardApiClient - integration - should handle token refresh workflow", async () => {
   setupEnv();
 
-  const client = new BlizzardApiClient();
+  const client = new BlizzardOauthService();
   const mockTokenResponse = {
     access_token: "fresh-token",
     token_type: "Bearer",
@@ -158,7 +158,7 @@ Deno.test("BlizzardApiClient - integration - should handle token refresh workflo
   const token = await client.fetchToken();
 
   // Create new client with the token
-  const authenticatedClient = new BlizzardApiClient(
+  const authenticatedClient = new BlizzardOauthService(
     "https://eu.api.blizzard.com",
     "https://oauth.battle.net",
     token.access_token

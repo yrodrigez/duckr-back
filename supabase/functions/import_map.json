@@ -1,0 +1,10 @@
+{
+  "imports": {
+    "@entities/": "./shared/domain/entities/",
+    "@errors/": "./shared/domain/errors/",
+    "@use-cases/": "./shared/application/use-cases/",
+    "@repositories/": "./shared/domain/repositories/",
+    "@external/": "./shared/infrastructure/external/",
+    "@database/": "./shared/infrastructure/database/"
+  }
+}

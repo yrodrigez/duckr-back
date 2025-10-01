@@ -1,5 +1,5 @@
 import * as log from "https://deno.land/std@0.208.0/log/mod.ts";
-import environment from "../environment.ts";
+import {getEnvironment} from "../environment.ts";
 
 export enum LogLevel {
 	DEBUG = "DEBUG",
@@ -101,7 +101,7 @@ class Logger {
 	}
 
 	private setupLogger(): void {
-		const env = environment();
+		const env = getEnvironment();
 		const logLevel = env.isProd ? LogLevel.INFO : LogLevel.DEBUG;
 
 		log.setup({

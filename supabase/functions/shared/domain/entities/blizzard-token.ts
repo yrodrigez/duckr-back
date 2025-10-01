@@ -5,11 +5,11 @@ export default class BlizzardToken {
 		public expires_at: Date,
 	) {}
 
-	static fromDatabase(data: { access_token: string; created_at: string; expires_at: string; }) {
+	static fromDatabase(data: { access_token: string; created_at: Date; expires_at: Date; }) {
 		return new BlizzardToken(
 			data.access_token,
-			new Date(data.created_at),
-			new Date(data.expires_at),
+			data.created_at,
+			data.expires_at,
 		);
 	}
 

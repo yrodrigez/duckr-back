@@ -1,5 +1,5 @@
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js";
-import environment from "../environment.ts";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.58.0";
+import {getEnvironment} from "../environment.ts";
 import { DatabaseConfigurationError } from "../../domain/errors/database-errors.ts";
 
 export interface DatabaseConfig {
@@ -10,10 +10,9 @@ export interface DatabaseConfig {
 export type DatabaseClient = SupabaseClient;
 export class DatabaseClientFactory {
 	private static instance: DatabaseClient;
-	private constructor() {}
-
+	
 	private static getConfig(): DatabaseConfig {
-		const { supabaseUrl, supabaseKey } = environment();
+		const { supabaseUrl, supabaseKey } = getEnvironment();
 		if (!supabaseUrl || !supabaseKey) {
 			throw new DatabaseConfigurationError(
 				`Supabase environment variables are not set missing ${
@@ -37,5 +36,6 @@ export class DatabaseClientFactory {
 
 			return this.instance;
 		}
+		return this.instance;
 	}
 }

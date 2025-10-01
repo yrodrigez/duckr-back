@@ -1,7 +1,7 @@
 import { GetBlizzardToken } from "../shared/application/use-cases/get-blizzard-token.ts";
 import { BlizzardTokenRepository } from "../shared/infrastructure/repositories/blizzard-token-repository.ts";
 import { DatabaseClientFactory } from "../shared/infrastructure/database/database-client-factory.ts";
-import { BlizzardApiClient } from "../shared/infrastructure/external/blizzard-api-client.ts";
+import { BlizzardOauthService } from "../shared/infrastructure/external/blizzard-generic-token-api-client.ts";
 import { DomainError } from "../shared/domain/errors/domain-error.ts";
 import { createLogger } from "../shared/infrastructure/logging/index.ts";
 
@@ -13,7 +13,7 @@ Deno.serve(async () => {
 
 		const tokenRepository = new BlizzardTokenRepository(
 			DatabaseClientFactory.getInstance(),
-			new BlizzardApiClient(),
+			new BlizzardOauthService(),
 		);
 		const getBlizzardTokenUseCase = new GetBlizzardToken(
 			tokenRepository,

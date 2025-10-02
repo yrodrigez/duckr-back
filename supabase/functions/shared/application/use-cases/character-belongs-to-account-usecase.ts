@@ -1,7 +1,6 @@
 import { IWowAccountService } from "../../domain/repositories/i-wow-account-service.ts";
 import { createLogger } from "../../infrastructure/logging/index.ts";
 import { WoWCharacter } from "../../domain/entities/wow/wow-character.ts";
-import { WowUserProfile } from "@entities/wow/wow-user-profile.ts";
 
 export class CharacterBelongsToAccountUsecase {
     constructor(
@@ -42,9 +41,9 @@ export class CharacterBelongsToAccountUsecase {
                 `Found ${foundNames.length} characters matching the criteria: ${foundNames}`,
             );
             return { belongs: foundNames.length > 0, characters };
-        } catch (e) {
+        } catch (e: unknown) {
             this.logger.error(
-                `Error checking character ownership: ${(e as Error).message}`,
+                `Error checking character ownership`, e
             );
             throw new Error(
                 `Error checking character ownership: ${(e as Error).message}`,

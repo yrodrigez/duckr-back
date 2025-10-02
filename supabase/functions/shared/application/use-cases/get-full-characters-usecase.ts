@@ -23,7 +23,7 @@ export default class GetFullCharactersUsecase {
                         char.name,
                     );
                     this.logger.info(`Fetched character ${char.name} on realm ${char.realmSlug} with level ${character.level}`);
-                    
+
 
                     const avatar = await this.characterService.getCharacterAvatar(
                         char.realmSlug,
@@ -36,7 +36,7 @@ export default class GetFullCharactersUsecase {
 
                     return char;
                 } catch (e) {
-                    this.logger.error(`Error fetching character ${char.name} with level on realm ${char.realmSlug}: ${(e as Error).message}`);
+                    this.logger.error(`Error fetching character ${char.name} with level on realm ${char.realmSlug}`, e);
                     return char;
                 }
             }),

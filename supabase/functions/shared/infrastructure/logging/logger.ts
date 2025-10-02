@@ -1,5 +1,58 @@
 import * as log from "https://deno.land/std@0.208.0/log/mod.ts";
-import {getEnvironment} from "../environment.ts";
+import { getEnvironment } from "../environment.ts";
+import { getRequestId } from "./request-context.ts";
+
+// Custom console handler that doesn't output debug messages
+class CleanConsoleHandler extends log.handlers.BaseHandler {
+	constructor(levelName: log.LevelName, private functionName: string) {
+		super(levelName);
+	}
+
+	override format(logRecord: log.LogRecord): string {
+		const sanitizedMessage = sanitizeMessage(logRecord.msg);
+		const context =
+			logRecord.args.length > 0 &&
+				typeof logRecord.args[0] === "object"
+				? ` ${JSON.stringify(sanitizeValue(logRecord.args[0]))}`
+				: "";
+
+		const requestId = getRequestId();
+		const requestIdPart = requestId !== "no-request-id" ? `[req:${requestId}]` : "";
+
+		return `[${this.functionName}] ${requestIdPart} ${sanitizedMessage}${context}`;
+	}
+
+	override log(msg: string): void {
+		console.log(msg);
+	}
+
+	override handle(logRecord: log.LogRecord): void {
+		if (this.level > logRecord.level) return;
+
+		const msg = this.format(logRecord);
+
+		// Use appropriate console method based on log level
+		switch (logRecord.level) {
+			case log.LogLevels.DEBUG:
+				console.debug(msg);
+				break;
+			case log.LogLevels.INFO:
+				console.info(msg);
+				break;
+			case log.LogLevels.WARNING:
+				console.warn(msg);
+				break;
+			case log.LogLevels.ERROR:
+				console.error(msg);
+				break;
+			case log.LogLevels.CRITICAL:
+				console.error(msg);
+				break;
+			default:
+				console.log(msg);
+		}
+	}
+}
 
 export enum LogLevel {
 	DEBUG = "DEBUG",
@@ -10,7 +63,7 @@ export enum LogLevel {
 }
 
 export interface LogContext {
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 const SENSITIVE_KEYS = [
@@ -37,13 +90,18 @@ const SENSITIVE_KEYS = [
 	"jwt",
 ];
 
-function sanitizeValue(value: any): any {
+function sanitizeValue(value: unknown): unknown {
 	if (value === null || value === undefined) {
 		return value;
 	}
 
 	if (typeof value === "string") {
-		return value.length > 0 ? "[REDACTED]" : value;
+		try {
+			const toJSON = JSON.parse(value);
+			return sanitizeValue(toJSON);
+		} catch (_: unknown) {
+			return value;
+		}
 	}
 
 	if (Array.isArray(value)) {
@@ -51,7 +109,7 @@ function sanitizeValue(value: any): any {
 	}
 
 	if (typeof value === "object") {
-		const sanitized: any = {};
+		const sanitized: Record<string, unknown> = {};
 		for (const [key, val] of Object.entries(value)) {
 			const lowerKey = key.toLowerCase();
 			const isSensitive = SENSITIVE_KEYS.some((sensitiveKey) =>
@@ -61,7 +119,7 @@ function sanitizeValue(value: any): any {
 			if (isSensitive) {
 				sanitized[key] = "[REDACTED]";
 			} else {
-				sanitized[key] = sanitizeValue(val);
+				(sanitized[key] as unknown) = sanitizeValue(val);
 			}
 		}
 		return sanitized;
@@ -106,24 +164,7 @@ class Logger {
 
 		log.setup({
 			handlers: {
-				console: new log.handlers.ConsoleHandler(logLevel, {
-					formatter: (logRecord) => {
-						const timestamp = new Date().toISOString();
-						const level = logRecord.levelName.padEnd(5);
-						const sanitizedMessage = sanitizeMessage(logRecord.msg);
-						const context =
-							logRecord.args.length > 0 &&
-								typeof logRecord.args[0] === "object"
-								? ` ${
-									JSON.stringify(
-										sanitizeValue(logRecord.args[0]),
-									)
-								}`
-								: "";
-
-						return `[${timestamp}] ${level} [${this.functionName}] ${sanitizedMessage}${context}`;
-					},
-				}),
+				console: new CleanConsoleHandler(logLevel, this.functionName),
 			},
 			loggers: {
 				default: {
@@ -165,7 +206,7 @@ class Logger {
 	): void {
 		const errorContext = error instanceof Error
 			? { error: error.message, stack: error.stack, ...context }
-			: { error: String(error), ...context };
+			: { ...(error ? { error: String(error) } : {}), ...context };
 
 		if (errorContext) {
 			this.logger.error(message, errorContext);

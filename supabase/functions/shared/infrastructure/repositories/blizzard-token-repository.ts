@@ -1,6 +1,6 @@
 import ITokenRepository from "../../domain/repositories/i-token-repository.ts";
 import { type DatabaseClient } from "../database/database-client-factory.ts";
-import { type BlizzardOauthService } from "../external/blizzard-generic-token-api-client.ts";
+import { type BlizzardOauthService } from "@external/blizzard-oauth-service.ts";
 import BlizzardToken from "../../domain/entities/blizzard-token.ts";
 import {
     TokenNotFoundError,

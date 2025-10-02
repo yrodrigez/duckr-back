@@ -6,7 +6,7 @@ export class WowUserProfile {
 		public readonly wow_accounts: WoWAccount[],
 	) {}
 
-	public static fromApiResponse(data: any): WoWAccount {
+	public static fromApiResponse(data: any): WowUserProfile {
 		const {id, wow_accounts} = data;
 		return new WowUserProfile(
 			id,

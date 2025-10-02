@@ -7,11 +7,11 @@ export type MemberCharacter = {
         slug: string;
     };
     level: number;
-    playable_class: {
-        name: string;
+    "playable_class": {
+        name?: string;
     };
-    character_class: {
-        name: string;
+    "character_class": {
+        name?: string;
     };
     guild?: {
         id: number;
@@ -19,7 +19,8 @@ export type MemberCharacter = {
         rank: number;
     };
     avatar: string;
-    last_login_timestamp: number;
+    "last_login_timestamp": number;
+    selectedRole?: string;
 };
 
 export class Member {

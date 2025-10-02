@@ -8,7 +8,7 @@ export default class WowAccountService extends BlizzardApi
 	private readonly namespace: string = "profile-classic1x-eu";
 
 	constructor(
-		private readonly token: string,
+		override readonly token: string,
 	) {
 		super(token);
 	}
@@ -31,8 +31,7 @@ export default class WowAccountService extends BlizzardApi
 		if (!response.ok) {
 			const errorData = await response.text();
 			throw new BlizzardApiError(
-				`Failed to fetch profile summary: ${response.status} ${response.statusText}`,
-				errorData,
+				`Failed to fetch profile summary: ${response.status} ${response.statusText} - ${errorData}`,
 			);
 		}
 

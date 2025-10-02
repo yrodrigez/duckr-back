@@ -1,7 +1,7 @@
 import { GetBlizzardToken } from "../shared/application/use-cases/get-blizzard-token.ts";
 import { BlizzardTokenRepository } from "../shared/infrastructure/repositories/blizzard-token-repository.ts";
 import { DatabaseClientFactory } from "../shared/infrastructure/database/database-client-factory.ts";
-import { BlizzardOauthService } from "../shared/infrastructure/external/blizzard-generic-token-api-client.ts";
+import { BlizzardOauthService } from "@external/blizzard-oauth-service.ts";
 import { DomainError } from "../shared/domain/errors/domain-error.ts";
 import { createLogger } from "../shared/infrastructure/logging/index.ts";
 

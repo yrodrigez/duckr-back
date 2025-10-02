@@ -2,6 +2,7 @@ import { getEnvironment } from "../environment.ts";
 import BlizzardToken from "../../domain/entities/blizzard-token.ts";
 import { BlizzardApiError } from "../../domain/errors/blizzard-api-error.ts";
 import { IBlizzardOAuthService } from "../../domain/services/i-blizzard-oauth-service.ts";
+import { createLogger } from "../logging/logger.ts";
 
 const environment = getEnvironment();
 export class BlizzardOauthService implements IBlizzardOAuthService {
@@ -9,6 +10,7 @@ export class BlizzardOauthService implements IBlizzardOAuthService {
     private readonly checkTokenPath = "/check_token";
     private readonly userInfoPath = "/userinfo";
     private readonly region = environment.blizzardRegion;
+    private logger = createLogger("BlizzardOauthService");
 
     constructor(
         private readonly oauthUrl: string = "https://oauth.battle.net",
@@ -28,8 +30,9 @@ export class BlizzardOauthService implements IBlizzardOAuthService {
 
         if (!response.ok) {
             const text = await response.text();
+            this.logger.error(`Failed to fetch user info`, undefined, { text });
             throw new BlizzardApiError(
-                `Failed to fetch user info: ${response.statusText} - ${text}`,
+                `Failed to fetch user info`,
             );
         }
 
@@ -48,8 +51,9 @@ export class BlizzardOauthService implements IBlizzardOAuthService {
 
         if (!response.ok) {
             const text = await response.text();
+            this.logger.error(`Failed to check token validity`, undefined, { text });
             throw new BlizzardApiError(
-                `Failed to check token validity: ${response.statusText} - ${text}`,
+                `Failed to check token validity`,
             );
         }
 

@@ -17,7 +17,7 @@ class CleanConsoleHandler extends log.handlers.BaseHandler {
 				: "";
 
 		const requestId = getRequestId();
-		const requestIdPart = requestId !== "no-request-id" ? `[req:${requestId}]` : "";
+		const requestIdPart = requestId !== "no-request-id" ? `[req:${requestId.substring(0, 8)}]` : "";
 
 		return `[${this.functionName}] ${requestIdPart} ${sanitizedMessage}${context}`;
 	}

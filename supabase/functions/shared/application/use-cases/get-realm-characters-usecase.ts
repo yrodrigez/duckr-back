@@ -1,7 +1,7 @@
 import { WoWCharacter } from "@entities/wow/wow-character.ts";
 import { type IWowAccountService } from "../../domain/repositories/i-wow-account-service.ts";
 
-export default class GetRealmCharactersUseCase {
+export class GetRealmCharactersUseCase {
 	constructor(
 		private readonly wowProfileApi: IWowAccountService,
 		private config: { realm: string },

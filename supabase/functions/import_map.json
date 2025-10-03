@@ -5,6 +5,8 @@
     "@use-cases/": "./shared/application/use-cases/",
     "@repositories/": "./shared/domain/repositories/",
     "@external/": "./shared/infrastructure/external/",
-    "@database/": "./shared/infrastructure/database/"
+    "@database/": "./shared/infrastructure/database/",
+    "@utils/": "./shared/utils/",
+    "@http/": "./shared/infrastructure/http/"
   }
 }
